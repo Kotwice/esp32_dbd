@@ -29,9 +29,9 @@ int8_t // pinout for TCA9548A -> SI5351; (unchanged)
 	pin_i2c_cls = 22;
 
 std::vector<float> frequency = {0,0,0,0,0,0}, voltage = {1000,500,700,800,0,0,0,0}, 
-	frequency_dac = {1000,10,100,0,0,0,0,0}; // initial parameters;
+	frequency_dac = {0,0,0,0,0,0,0,0}; // initial parameters;
 
-std::vector<int> frequency_index = {0};
+std::vector<int> frequency_index = {};
 
 SPISettings settings(10000000, MSBFIRST, SPI_MODE0);
 
@@ -129,6 +129,14 @@ void set_voltage (uint8_t command, uint8_t address, float value) {
 	SPI.endTransaction();
 }
 
+void print_index () {
+	String temporary = "frequency_index=";
+	for (int i = 0; i < frequency_index.size(); i++) {
+		temporary = temporary + " " + String(frequency_index[i]);
+	}
+	Serial.println(temporary);
+}
+
 struct variables {
 	std::vector<float>* value;
 	std::function<void(float, int8_t)> function;
@@ -161,15 +169,14 @@ std::map<String, variables> parameters = {
 				#ifdef DEBUG
 					Serial.println("fdac[" + String(channel) + "]=" + String(value));
 				#endif
-				if (value == 0) {
+				if (int(value) == 0) {
 					std::vector<int>::iterator position = std::find(frequency_index.begin(), frequency_index.end(), channel);
-					if (position != frequency_index.end()) {
-						frequency_index.erase(position);
-					}
+					frequency_index.erase(position);
 				}
 				else {
 					frequency_index.push_back(channel);
 				}
+				print_index();
 			}
 		}
 	}
@@ -333,8 +340,9 @@ void setup() {
 
 	timer_control.function = [] () {
 		for (int i = 0; i < frequency_index.size(); i++) {
-			set_voltage(SETVOL, i, voltage[frequency_index[i]] * 
-				(1 - sin(2*3.14*frequency_dac[frequency_index[i]]*current_time*1e-6)));
+			int index = int(frequency_index[i]);
+			set_voltage(SETVOL, i, voltage[index] * 
+				(1 - sin(2*3.14*frequency_dac[index]*current_time*1e-6)));
 		} 
 	};
 

@@ -1,6 +1,6 @@
 $(document).ready( () => {
 
-    let arrays = {"fm": {"new": [], "old": []}, "dac": {"new": [], "old": []}}
+    let arrays = {"fm": {"new": [], "old": []}, "dac": {"new": [], "old": []}, "fdac": {"new": [], "old": []}}
 
     function isValidJsonString(jsonString) {    
         if(!(jsonString && typeof jsonString === "string")){
@@ -84,6 +84,7 @@ $(document).ready( () => {
     let form = [
         {'indicator-input': 'input-1', 'limits': [8, 200], 'length': 6, 'indicator-button': 'button-1', 'parameter': 'fm'},
         {'indicator-input': 'input-2', 'limits': [0, 4096], 'length': 8, 'indicator-button': 'button-2', 'parameter': 'dac'},
+        {'indicator-input': 'input-3', 'limits': [0, 2000], 'length': 8, 'indicator-button': 'button-3', 'parameter': 'fdac'}
     ]
 
     function initialaze () {

@@ -12,20 +12,26 @@
 </head>
 <body id = 'body'>
 
-    <div class = 'd-flex justify-content-center align-items-center'>
-        <div class = 'input-group mb-3'>
-            <span class = 'input-group-text' id = 'basic-addon-unit-1'>f [kHz]</span>
-            <input type = 'text' class = 'form-control' placeholder = 'Frequency' aria-label = 'Frequency' id = 'input-1'>
-            <span class = 'input-group-text' id = 'basic-addon-param-1'>limit=[8, 200] channels=6</span>
-        </div>
+    <label for = 'input-1'>SI5351</label>
+    <div class = 'input-group mb-3'>
+        <span class = 'input-group-text' id = 'basic-addon-unit-1'>f [kHz]</span>
+        <input type = 'text' class = 'form-control' placeholder = 'Frequency' aria-label = 'Frequency' id = 'input-1'>
+        <span class = 'input-group-text' id = 'basic-addon-param-1'>limit=[8, 200] channels=6</span>
     </div>
 
+    <label for = 'input-2'>LTC2636</label>
     <div class = 'd-flex justify-content-center align-items-center'>
         <div class = 'input-group mb-3'>
             <span class = 'input-group-text' id = 'basic-addon-unit-2'>U [mV]</span>
             <input type = 'text' class = 'form-control' placeholder = 'Voltage' aria-label = 'Voltage' id = 'input-2'>
             <span class = 'input-group-text' id = 'basic-addon-param-2'>limit=[0, 4096] channels=8</span>
         </div>
+    </div>
+
+    <div class = 'input-group mb-3'>
+        <span class = 'input-group-text' id = 'basic-addon-unit-3'>f [Hz]</span>
+        <input type = 'text' class = 'form-control' placeholder = 'Frequency' aria-label = 'Frequency' id = 'input-3'>
+        <span class = 'input-group-text' id = 'basic-addon-param-3'>limit=[0, 2000] channels=8</span>
     </div>
 
     <div class = 'd-flex justify-content-center align-items-center'>
