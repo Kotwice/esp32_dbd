@@ -11,26 +11,74 @@
 #include <map>
 #include <vector>
 #include <si5351.h>
+#include <Timer.h>
+#include <cmath>
 
-#define DEBUG
-#define C3 3
-#define TCAADDR 0x70
+#define DEBUG // DEBUG MODE;
+#define TCAADDR 0x70 // I2C address of TCA9548A;
+#define SETVOL 0b0011
 
+int8_t // pinout for ltc2636;
+	pin_spi_cs = 19,
+	pin_spi_sck = 18,
+	pin_spi_mosi = 5,
+	pin_spi_miso = 2;
 
+int8_t // pinout for TCA9548A -> SI5351; (unchanged)
+	pin_i2c_sda = 21,
+	pin_i2c_cls = 22;
+
+std::vector<float> frequency = {0,0,0,0,0,0}, voltage = {1000,500,700,800,0,0,0,0}, 
+	frequency_dac = {1000,10,100,0,0,0,0,0}; // initial parameters;
+
+std::vector<int> frequency_index = {0};
+
+SPISettings settings(10000000, MSBFIRST, SPI_MODE0);
+
+/* Sin generate */
+uint32_t current_time;
+float duration_control = 1;
+bool state_control = true;
+
+Timer timer_control(&current_time, &duration_control, &state_control);
+
+/* WIFI SETTINGS */
+struct wifi_net {
+
+	const char* ssid = "esp32_dbd";
+	const char* password = "qwerty123";
+	const int channel = 1;
+	const int ssid_hidden = 0;
+	const int max_connection = 1;
+
+} wifi_configuration;
+
+const int port = 8080;
+IPAddress local_ip(192, 168, 1, 1);
+IPAddress gateway(192, 168, 1, 1);
+IPAddress subnet(255, 255, 255, 0);
 
 #define HTML_OK 200
-// #define json_append(object, json) for (auto& element: object) {json[element->first] = *(element->second.value);}
 
-// SI5351
-#define SI5351_ADDRESS_0 0x60
-#define SI5351_ADDRESS_1 0x61
+void initiate_ltc2636 () {
 
-// Si5351 si5351(0x60);
+	pinMode(pin_spi_cs, OUTPUT);
+	pinMode(pin_spi_sck, OUTPUT);
+	pinMode(pin_spi_mosi, OUTPUT);
+	pinMode(pin_spi_miso, INPUT);
 
-int16_t SI5351_ADDRESS_ARRAY[6] = {SI5351_ADDRESS_0, SI5351_ADDRESS_0, SI5351_ADDRESS_0, 
-	SI5351_ADDRESS_1, SI5351_ADDRESS_1, SI5351_ADDRESS_1,};
+	digitalWrite(pin_spi_cs, HIGH);
+	digitalWrite(pin_spi_sck, LOW);
+	digitalWrite(pin_spi_mosi, LOW);
+
+	SPI.begin(pin_spi_sck, pin_spi_miso, pin_spi_mosi, pin_spi_cs);
+
+}
 
 void initiate_si5351 () {
+
+	Wire.begin();
+
 	Wire.beginTransmission(TCAADDR);
 	Wire.write(1 << 0);
 	Wire.endTransmission();
@@ -44,36 +92,6 @@ void initiate_si5351 () {
 	si5351_EnableOutputs((1<<0) | (1<<2));
 }
 
-// void initialte_si5153 () {
-// 	// bool i2c_found;
-// 	// i2c_found = si5351.init(SI5351_CRYSTAL_LOAD_8PF, 0, 0);
-// 	// if(!i2c_found) {Serial.println("Device SI5153 not found on I2C bus!");}
-// 	// // si5351.output_enable(SI5351_CLK0, 1); 
-// 	// // si5351.output_enable(SI5351_CLK1, 0);
-// 	// // si5351.output_enable(SI5351_CLK2, 0);
-// 	bool i2c_found;
-
-//   // Start serial and initialize the Si5351
-
-//   i2c_found = si5351.init(SI5351_CRYSTAL_LOAD_8PF, 0, 0);
-//   if(!i2c_found)
-//   {
-//     Serial.println("Device not found on I2C bus!");
-//   }
-
-//   // Set CLK0 to output 14 MHz
-//   si5351.set_freq(1400000000ULL, SI5351_CLK0);
-
-//   // Set CLK1 to output 175 MHz
-//   si5351.set_ms_source(SI5351_CLK1, SI5351_PLLB);
-//   si5351.set_freq_manual(17500000000ULL, 70000000000ULL, SI5351_CLK1);
-
-//   // Query a status update and wait a bit to let the Si5351 populate the
-//   // status flags correctly.
-//   si5351.update_status();
-//   delay(500);
-// }
-
 void set_frequency (uint8_t channel, float value) {
 
 	uint8_t device_index;
@@ -82,13 +100,6 @@ void set_frequency (uint8_t channel, float value) {
 	Wire.beginTransmission(TCAADDR);
 	Wire.write(1 << device_index);
 	Wire.endTransmission();
-
-	// Wire.beginTransmission(SI5351_ADDRESS_ARRAY[channel]);
-
-	// 	Wire.write(3);
-	// 	Wire.write(1 << channel);
-
-	// uint8_t error = Wire.endTransmission(true);
 
 	if (channel == 0) {
 		si5351_SetupCLK0(int(value*1e3), SI5351_DRIVE_STRENGTH_4MA);
@@ -107,25 +118,7 @@ void set_frequency (uint8_t channel, float value) {
 		// si5351_EnableOutputs(1<<2);
 	}
 
-	// if (channel == 0) {
-	// 	si5351.set_freq(int(value*1e3), SI5351_CLK0);
-	// }
-	// if (channel == 1) {
-	// 	si5351.set_freq(int(value*1e3), SI5351_CLK1);	
-	// }
-	// if (channel == 2) {
-	// 	si5351.set_freq(int(value*1e3), SI5351_CLK2);	
-	// }
-
 }
-
-int8_t 
-	pin_spi_cs = 19,
-	pin_spi_sck = 18,
-	pin_spi_mosi = 5,
-	pin_spi_miso = 2;
-
-SPISettings settings(2000000, MSBFIRST, SPI_MODE0);
 
 void set_voltage (uint8_t command, uint8_t address, float value) {
 	SPI.beginTransaction(settings);
@@ -135,8 +128,6 @@ void set_voltage (uint8_t command, uint8_t address, float value) {
 	digitalWrite(pin_spi_cs, HIGH);
 	SPI.endTransaction();
 }
-
-std::vector<float> frequency = {10,10,10,10,10,10}, voltage = {1,1,1,1,1,1,1,1};
 
 struct variables {
 	std::vector<float>* value;
@@ -160,26 +151,29 @@ std::map<String, variables> parameters = {
 				#ifdef DEBUG
 					Serial.println("dac[" + String(channel) + "]=" + String(value));
 				#endif
-				set_voltage(0b0011, channel, value);
+				set_voltage(SETVOL, channel, value);
+			}
+		}
+	},
+	{"fdac", {
+		&frequency_dac, 
+		[] (float value, int8_t channel) {
+				#ifdef DEBUG
+					Serial.println("fdac[" + String(channel) + "]=" + String(value));
+				#endif
+				if (value == 0) {
+					std::vector<int>::iterator position = std::find(frequency_index.begin(), frequency_index.end(), channel);
+					if (position != frequency_index.end()) {
+						frequency_index.erase(position);
+					}
+				}
+				else {
+					frequency_index.push_back(channel);
+				}
 			}
 		}
 	}
 };
-
-struct wifi_net {
-
-	const char* ssid = "esp32_dbd";
-	const char* password = "qwerty123";
-	const int channel = 1;
-	const int ssid_hidden = 0;
-	const int max_connection = 1;
-
-} wifi_configuration;
-
-const int port = 8080;
-IPAddress local_ip(192, 168, 1, 1);
-IPAddress gateway(192, 168, 1, 1);
-IPAddress subnet(255, 255, 255, 0);
 
 AsyncWebServer server(port);
 
@@ -191,7 +185,7 @@ std::vector<String> pathes;
 
 std::vector<WebFile> webfiles;
 
-void get_pathes(fs::FS &fs, const char * dirname, uint8_t levels){
+void getPathes(fs::FS &fs, const char * dirname, uint8_t levels){
     File root = fs.open(dirname);
     if(!root){
         return;
@@ -203,7 +197,7 @@ void get_pathes(fs::FS &fs, const char * dirname, uint8_t levels){
     while(file){
         if(file.isDirectory()){
             if(levels){
-                get_pathes(fs, file.name(), levels - 1);
+                getPathes(fs, file.name(), levels - 1);
             }
         } else {
             pathes.push_back(file.name());
@@ -212,9 +206,9 @@ void get_pathes(fs::FS &fs, const char * dirname, uint8_t levels){
     }
 }
 
-void initiate_file_system () {
+void initiateFileSystem () {
     SPIFFS.begin();
-    get_pathes(SPIFFS, "/", 0);
+    getPathes(SPIFFS, "/", 0);
     WebFile temporary; 
     for (String path: pathes) {
         temporary.path = path;
@@ -256,7 +250,7 @@ void initiateWebServer () {
 		}
 	});
 
-	initiate_file_system();
+	initiateFileSystem();
 
     for (WebFile webfile: webfiles) {
         
@@ -318,47 +312,35 @@ void initiateWebServer () {
 	server.begin();
 }
 
-void setup() {
+void initiate_parameters () {
+	for (int i = 0; i < frequency.size(); i++) {set_frequency(i, frequency[i]);}
+	for (int i = 0; i < voltage.size(); i++) {set_voltage(SETVOL, i, voltage[i]);}
+}
 
-	Wire.begin();
+void setup() {
 
     #ifdef DEBUG
 		Serial.begin(115200);
 	#endif
-	
-	pinMode(pin_spi_cs, OUTPUT);
-	pinMode(pin_spi_sck, OUTPUT);
-	pinMode(pin_spi_mosi, OUTPUT);
-	pinMode(pin_spi_miso, INPUT);
-
-	digitalWrite(pin_spi_cs, HIGH);
-	digitalWrite(pin_spi_sck, LOW);
-	digitalWrite(pin_spi_mosi, LOW);
-
-	SPI.begin(pin_spi_sck, pin_spi_miso, pin_spi_mosi, pin_spi_cs);
 
 	initiateWebServer();
 
-	// initialte_si5153();
-	// si5351.set_freq(1400000000ULL, SI5351_CLK0);
-	// si5351.update_status();
+	initiate_ltc2636();
+
 	initiate_si5351();
+
+	initiate_parameters();
+
+	timer_control.function = [] () {
+		for (int i = 0; i < frequency_index.size(); i++) {
+			set_voltage(SETVOL, i, voltage[frequency_index[i]] * 
+				(1 - sin(2*3.14*frequency_dac[frequency_index[i]]*current_time*1e-6)));
+		} 
+	};
 
 }
 
 void loop() {
-//   // Read the Status Register and print it every 10 seconds
-//   si5351.update_status();
-//   Serial.print("SYS_INIT: ");
-//   Serial.print(si5351.dev_status.SYS_INIT);
-//   Serial.print("  LOL_A: ");
-//   Serial.print(si5351.dev_status.LOL_A);
-//   Serial.print("  LOL_B: ");
-//   Serial.print(si5351.dev_status.LOL_B);
-//   Serial.print("  LOS: ");
-//   Serial.print(si5351.dev_status.LOS);
-//   Serial.print("  REVID: ");
-//   Serial.println(si5351.dev_status.REVID);
-
-//   delay(10000);
+	current_time = micros();
+	timer_control.update();
 }
